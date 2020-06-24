@@ -1,0 +1,106 @@
+library("deSolve", lib.loc="~/R/x86_64-pc-linux-gnu-library/3.4")
+LVmod1D <- function (time, state, parms, N, dx) {
+  with (as.list(parms), {
+    K0 <- state[1:N]
+    Ki <- state[(1+N):(2*N)]
+    C0 <- state[(2*N+1):(3*N)]
+    Ci <- state[(3*N+1):(4*N)]
+    
+    #potentials and active transport
+    {
+      V<- 58 *log10((K0+d1)/(Ki+d2))
+      Vk<-58*log10(K0/Ki)
+      Vca<- 29*log10(C0/Ci)
+      Pk <-fk*(1-exp(-rk*(K0-K0R)))
+      Pca <- fca*(1-exp(-rca*(Ci-CiR)))
+      gca <- g0 *(1+tanh(pg*(V+Vg)))
+    }
+    
+    ## Dispersive fluxes; zero-gradient boundaries
+    FluxK0 <- -Dk * diff(c(K0[1], K0, K0[N]))/dx
+    FluxC0 <- -Dca * diff(c(C0[1], C0, C0[N]))/dx
+    
+    ## Biology: Conductance 
+    cond_k <- p1*gca*(V-Vca)*(V-Vk)
+    cond_ca <- p2*gca*(V-Vca)
+    
+    ## Rate of change = -Flux gradient + Biology
+    dK0 <- -diff(FluxK0)/dx + cond_k +Pk
+    dki <- -(a/(1-a))*cond_k+Pk
+    dC0 <- -diff(FluxC0)/dx + cond_ca +Pca
+    dCi <- -(a/(1-a))*cond_ca +Pca
+    
+    return (list(c(dK0, dki, dC0, dCi)))
+  })
+}
+
+
+R  <- 20
+N  <- 100
+dx <- R/N
+
+#initial conditions
+yini <- rep(0, 4*N)
+yini[1:N]<-2 #K0
+yini[(1+N):(2*N)] <- 140 #Ki
+yini[(2*N+1):(3*N)]<- 1 #C0
+yini[(3*N+1):(4*N)] <- 0.05 #ci
+
+
+times <-seq(0, 50, by = 0.1)
+print(system.time(
+  out <- ode.1D(y = yini, times = times, func = LVmod1D,
+                parms =  c(Dk=2*10^(-5), Dca=1.25*10^(-5), g0=0.015, pg=0.11, Vg=45,
+                           a=0.2,p1=-5,p2=0.5,d1=9,d2=40,fk=-5.2,fca=0.052,rk=10,rca=40,K0R=2,CiR=0.05),
+                nspec = 4, N = N, dx = dx)
+))
+#
+# for (i in 1:4){
+#   variables <- c(dK0, dki, dC0, dCi)
+#   values(variables) <-c(out[,i])
+#
+# }
+variables <- c("dK0", "dki", "dC0", "dCi")
+# for (j in 1:4){
+#   for (i in 1:4) {
+#     if (i != j) {
+#       plot(out[,i], out[,j], type = "l", main = paste(variables[i],"vs.",variables[j]), xlab = variables[i], ylab = variables[j])
+#       points (yini[i], yini[j])
+#       lines(out[ ,c(i, j)], lwd = 2, lty = 2)
+#     }
+#   }
+# }
+# for (i in 1:4){
+#  plot(times, out[,i], type = "l", main = paste(variables[i],"vs.","time", xlab = "times", ylab = variables[i]))
+ # points (times, yini[i])
+# }
+
+plot(out[,1], type = "l", main = paste("dK0","vs.","time"), xlab = "times", ylab = variables[1])
+points (out[1])
+plot(out[,2], type = "l", main = paste("dki","vs.","time"), xlab = "times", ylab = variables[2])
+points (out[2])
+plot(out[,3], type = "l", main = paste("dC0","vs.","time"), xlab = "times", ylab = variables[3])
+points (out[3])
+plot(out[,4], type = "l", main = paste("dCi","vs.","time"), xlab = "times", ylab = variables[4])
+points (out[4])
+
+
+
+#
+# i<-1
+# plot((out[,i]), out[i+1], type = "l", main = paste("dc0 vs. dci"), xlab = out[,i], ylab = out[,i+1])
+# points (yini[i], yini[i+1])
+}
+
+#
+#
+plot(out[,1], out[,2], type = "l", main = paste("dc0","vs.","dci"), xlab = "dc0", ylab = "dci")
+points (yini[1], yini[2])
+# plot(out[,3], out[,4], type = "l", main = paste("dk0","vs.","dki"), xlab = "dk0", ylab = "dki")
+# points (yini[3], yini[4])
+# plot(out[,1], out[,3], type = "l", main = paste("dc0","vs.","dk0"), xlab = "dc0", ylab = "dk0")
+# points (yini[1], yini[3])
+# plot(out[,2], out[,4], type = "l", main = paste("dci","vs.","dki"), xlab = "dci", ylab = "dki")
+# points (yini[2], yini[4])
+
+
